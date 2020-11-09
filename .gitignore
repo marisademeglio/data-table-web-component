@@ -1,0 +1,4 @@
+/node_modules/
+
+# only generated for size check
+data-table.bundled.js
