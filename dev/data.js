@@ -6,8 +6,8 @@ let sortByAge = (rowA, rowB) => {
 };
 let sortBySport = (rowA, rowB) => {
     // not all students have a sport listed
-    if (!rowA.sport) return -1;
-    if (!rowB.sport) return 1;
+    if (!rowA.sport) return 1;
+    if (!rowB.sport) return -1;
     return sortAlpha(rowA.sport, rowB.sport);
 };
 let sortByName = (rowA, rowB) => {

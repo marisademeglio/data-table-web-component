@@ -237,72 +237,24 @@ So, if you start with a wide screen and then shrink it down, you have to refresh
 
 ## Style
 
-Use the `stylesheet` attribute to provide a stylesheet for the web component. If present, this creates a `<link>` to the stylesheet in the web component.
-
-However, this can cause flickering. 
-
-The workaround is to paste your CSS into the `data-table.js` file itself. Go to line `2526`, or thereabouts:
-
-```js
-static get styles() {
-    return css``;
-}
-```
-
-Change it to include your style, e.g. 
-
-```js
-static get styles() {
-    return css`
-    h1 {
-        color: purple;
-    }
-    `;
-}
-```
-
-This is a good final step to take before deployment. It's easier to use an external stylesheet during development.
-
-### Markup
-
-The following conventions are used:
-
-Wrapper which contains the entire contents of the web component: 
-```
-<div class="data-table">
-```
-
-Filters:
-```
-<fieldset class="filters">
-    <div>
-        <label>Name</label>
-        <select>
-            <option>Robin</option>
-            <option>Alex</option>
-            <option>Jules</option>
-        </select>
-    </div>
-    ...
-</fieldset>
-```
-
-*Note* filters are wrapped in a `details` element on smaller screens.
-
-Column selectors are radio buttons:
+### Custom properties
 
 ```
-<filterset class="column-selector">
-    <legend>Select a topic</legend>
-    
-    <input type="radio" name="column-selector" id="column-selector-1" checked="">
-    <label for="column-selector-1">Name</label>
-    
-    <input type="radio" name="column-selector" id="column-selector-1" checked="">
-    <label for="column-selector-1">Age</label>
-    ...
-</details>
+--custom-table-stripes-background-color
+--custom-table-header-background-color
+--custom-button-active-background-color
+--custom-button-background-color
+--custom-sort-icons-color
 ```
+
+### Inline styles
+
+Your custom table cell rendering markup may contain style information, via `style` attribute or element.
+
+### External stylesheet
+
+Use the data table element's `stylesheet` attribute to provide a stylesheet for the web component. If present, this creates a `<link>` to the stylesheet in the web component. However, this can cause a flicker of unstyled content when intially rendered. 
+
 
 ## Potential TODOs
 
@@ -316,3 +268,5 @@ Introduce defaults for sorting and searching, to reduce the configuration requir
 Multiple levels of headers
 
 Second option for mobile adaptation: paginated view
+
+Filters that use observable properties

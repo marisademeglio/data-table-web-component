@@ -2522,9 +2522,90 @@ const unsafeHTML = directive((value) => (part) => {
     previousValues.set(part, { value, fragment });
 });
 
+const dataTableStyles = css`.data-table{--default-table-stripes-background-color:rgba(174, 195, 240, 0.2);--default-table-header-background-color:#6690e9;--default-button-active-background-color:rgba(174, 195, 240, 0.3);--default-button-background-color:rgba(0, 0, default-0, .6);--default-sort-icons-color:rgba(120, 120, 120);--table-stripes-background-color:var(--custom-table-stripes-background-color, var(--default-table-stripes-background-color));--table-header-background-color:var(--custom-table-header-background-color, var(--default-table-header-background-color));--button-active-background-color:var(--custom-button-active-background-color, var(--default-button-active-background-color));--button-background-color:var(--custom-button-background-color, var(--default-button-background-color));--sort-icons-color:var(--custom-sort-icons-color, var(--default-sort-icons-color));--button-padding:0.25rem;--button-border:thin solid rgba(0,0,0,0.4);--button-border-radius:4px}fieldset{border:none;padding:0;margin-bottom:1rem}table{border-collapse:collapse;table-layout:fixed;width:100%}td,th{text-align:left;font-size:smaller;font-weight:400;vertical-align:top;padding:2vh}th{vertical-align:middle;font-weight:bolder;position:-webkit-sticky;position:sticky;top:0;z-index:2;background:var(--table-header-background-color)}button{border:var(--button-border);border-radius:var(--button-border-radius);padding:var(--button-padding);background-color:var(--button-normal-background-color);line-height:1.6}button:hover{background-color:var(--button-active-background-color)}select{border:var(--button-border);border-radius:var(--button-border-radius);height:1.5rem}input[type=text]{border:var(--button-border);border-radius:var(--button-border-radius);height:1.5rem}.data-table>*{height:min-content}.filters{display:flex;flex-wrap:wrap;gap:2rem;padding-right:20%}.filters legend{visibility:hidden}.filters label::after{content:': '}.filters label{font-size:smaller}.column-selectors input[type=radio]{opacity:0;position:fixed;width:0}.column-selectors label{border:var(--button-border);border-radius:var(--button-border-radius);background-color:var(--button-background-color);padding:var(--button-padding);display:inline-block;white-space:nowrap;margin:1px;opacity:60%}.column-selectors input[type=radio]:checked+label{background-color:var(--button-active-background-color);text-decoration:underline;opacity:100%}.column-selectors input[type=radio]:not(:checked)+label:hover{background-color:var(--button-active-background-color)}thead th.sortable{cursor:pointer}thead th.sortable::after{color:var(--sort-icons-color)}thead th.sortable[aria-sort=ascending]::after{content:'▲'}thead th.sortable[aria-sort=descending]::after{content:'▼'}tbody tr:nth-child(even){background-color:var(--table-stripes-background-color)}table tr td:first-child span.sw{display:block}@media(min-width:769px){.column-selectors{display:none}}@media(max-width:768px){.filters{display:grid;margin-top:1rem;gap:.5rem;padding-right:0}.filters input,.filters label{font-size:inherit}.filters label{white-space:nowrap}.filters div{display:grid;grid-template-columns:30% 40% auto;gap:.5rem}.filters button{width:min-content;justify-self:center}.filters div label{justify-self:right}}`;
+
+/**
+ * @license
+ * Copyright (c) 2018 The Polymer Project Authors. All rights reserved.
+ * This code may only be used under the BSD style license found at
+ * http://polymer.github.io/LICENSE.txt
+ * The complete set of authors may be found at
+ * http://polymer.github.io/AUTHORS.txt
+ * The complete set of contributors may be found at
+ * http://polymer.github.io/CONTRIBUTORS.txt
+ * Code distributed by Google as part of the polymer project is also
+ * subject to an additional IP rights grant found at
+ * http://polymer.github.io/PATENTS.txt
+ */
+/**
+ * Stores the StyleInfo object applied to a given AttributePart.
+ * Used to unset existing values when a new StyleInfo object is applied.
+ */
+const previousStylePropertyCache = new WeakMap();
+/**
+ * A directive that applies CSS properties to an element.
+ *
+ * `styleMap` can only be used in the `style` attribute and must be the only
+ * expression in the attribute. It takes the property names in the `styleInfo`
+ * object and adds the property values as CSS properties. Property names with
+ * dashes (`-`) are assumed to be valid CSS property names and set on the
+ * element's style object using `setProperty()`. Names without dashes are
+ * assumed to be camelCased JavaScript property names and set on the element's
+ * style object using property assignment, allowing the style object to
+ * translate JavaScript-style names to CSS property names.
+ *
+ * For example `styleMap({backgroundColor: 'red', 'border-top': '5px', '--size':
+ * '0'})` sets the `background-color`, `border-top` and `--size` properties.
+ *
+ * @param styleInfo {StyleInfo}
+ */
+const styleMap = directive((styleInfo) => (part) => {
+    if (!(part instanceof AttributePart) || (part instanceof PropertyPart) ||
+        part.committer.name !== 'style' || part.committer.parts.length > 1) {
+        throw new Error('The `styleMap` directive must be used in the style attribute ' +
+            'and must be the only part in the attribute.');
+    }
+    const { committer } = part;
+    const { style } = committer.element;
+    let previousStyleProperties = previousStylePropertyCache.get(part);
+    if (previousStyleProperties === undefined) {
+        // Write static styles once
+        style.cssText = committer.strings.join(' ');
+        previousStylePropertyCache.set(part, previousStyleProperties = new Set());
+    }
+    // Remove old properties that no longer exist in styleInfo
+    // We use forEach() instead of for-of so that re don't require down-level
+    // iteration.
+    previousStyleProperties.forEach((name) => {
+        if (!(name in styleInfo)) {
+            previousStyleProperties.delete(name);
+            if (name.indexOf('-') === -1) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                style[name] = null;
+            }
+            else {
+                style.removeProperty(name);
+            }
+        }
+    });
+    // Add or update properties
+    for (const name in styleInfo) {
+        previousStyleProperties.add(name);
+        if (name.indexOf('-') === -1) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            style[name] = styleInfo[name];
+        }
+        else {
+            style.setProperty(name, styleInfo[name]);
+        }
+    }
+});
+
 class DataTable extends LitElement {
     static get styles() {
-        return css``;
+        return [
+            dataTableStyles
+        ];
     }
 
     /*
@@ -2540,7 +2621,7 @@ class DataTable extends LitElement {
     options: {
         defaultSortHeader: index of header to sort by, initially. 0 by default.,
         getHeaderCellDisplay: func(header, idx) to get text displayed for a header cell,
-        getBodyCellDisplay: func(header, row, headerIdx, rowIdx) to get {cellClass, cellContent} displayed for a row cell,
+        getBodyCellDisplay: func(header, row, headerIdx, rowIdx) to get content displayed for a row cell,
         filters: Array [{
                 name, 
                 path: func(row) for what to filter,
@@ -2562,7 +2643,8 @@ class DataTable extends LitElement {
             hiddenColumns: {type: Array, attribute: false}, // this property doesn't get set, just observed internally
             summary: {type: String},
             stylesheet: {type: String},
-            customClass: {type: String}
+            customClass: {type: String},
+            
         };
     }
 
@@ -2585,7 +2667,8 @@ class DataTable extends LitElement {
         };
         this.stylesheet = '';
         this.hiddenColumns = [];
-        this.customClass = '';
+        this.customClass = '',
+        this.styles = {};
     }
 
     setFilterValue(filterName, filterValue) {
@@ -2815,7 +2898,7 @@ class DataTable extends LitElement {
                 html`<link rel="stylesheet" href="${this.stylesheet}">`
                 : 
                 ``
- }<div class="data-table ${this.customClass}">${filtersHtml} ${columnSelectorHtml}<table summary="${this.summary}" aria-live="polite" aria-colcount="${this.data.headers.length}" aria-rowcount="${rows.length}"><thead><tr>${this.data.headers.map((header, idx) => {
+ }<div class="data-table ${this.customClass}" style="${styleMap(this.styles)}">${filtersHtml} ${columnSelectorHtml}<table summary="${this.summary}" aria-live="polite" aria-colcount="${this.data.headers.length}" aria-rowcount="${rows.length}"><thead><tr>${this.data.headers.map((header, idx) => {
                                 if (this.hiddenColumns.includes(idx)) {
                                     return '';
                                 }
@@ -2855,16 +2938,13 @@ class DataTable extends LitElement {
                                         this.hiddenColumns.includes(headerIdx) ==
                                         false
                                     ) {
-                                        let {
-                                            cellClass,
-                                            cellContent,
-                                        } = this.options.getBodyCellDisplay(
+                                        let cellContent = this.options.getBodyCellDisplay(
                                             header,
                                             row,
                                             headerIdx,
                                             rowIdx
                                         );
-                                        return html`<td class="${cellClass}">${unsafeHTML(cellContent)}</td>`;
+                                        return html`<td>${unsafeHTML(cellContent)}</td>`;
                                     } else {
                                         return ``;
                                     }

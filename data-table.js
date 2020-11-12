@@ -1,9 +1,13 @@
 import {LitElement, html, css } from 'lit-element';
 import {unsafeHTML} from 'lit-html/directives/unsafe-html.js';
+import { dataTableStyles } from './data-table-styles.js';
+import { styleMap } from 'lit-html/directives/style-map';
 
 export class DataTable extends LitElement {
     static get styles() {
-        return css``;
+        return [
+            dataTableStyles
+        ];
     }
 
     /*
@@ -19,7 +23,7 @@ export class DataTable extends LitElement {
     options: {
         defaultSortHeader: index of header to sort by, initially. 0 by default.,
         getHeaderCellDisplay: func(header, idx) to get text displayed for a header cell,
-        getBodyCellDisplay: func(header, row, headerIdx, rowIdx) to get {cellClass, cellContent} displayed for a row cell,
+        getBodyCellDisplay: func(header, row, headerIdx, rowIdx) to get content displayed for a row cell,
         filters: Array [{
                 name, 
                 path: func(row) for what to filter,
@@ -41,7 +45,8 @@ export class DataTable extends LitElement {
             hiddenColumns: {type: Array, attribute: false}, // this property doesn't get set, just observed internally
             summary: {type: String},
             stylesheet: {type: String},
-            customClass: {type: String}
+            customClass: {type: String},
+            
         };
     }
 
@@ -64,7 +69,8 @@ export class DataTable extends LitElement {
         };
         this.stylesheet = '';
         this.hiddenColumns = [];
-        this.customClass = ''
+        this.customClass = '',
+        this.styles = {};
     }
 
     setFilterValue(filterName, filterValue) {
@@ -297,7 +303,8 @@ export class DataTable extends LitElement {
                 ``
             }
 
-            <div class="data-table ${this.customClass}">
+            <div class="data-table ${this.customClass}"
+                style=${styleMap(this.styles)}>
                 ${filtersHtml} 
                 ${columnSelectorHtml}
 
@@ -365,16 +372,14 @@ export class DataTable extends LitElement {
                                         this.hiddenColumns.includes(headerIdx) ==
                                         false
                                     ) {
-                                        let {
-                                            cellClass,
-                                            cellContent,
-                                        } = this.options.getBodyCellDisplay(
+                                        let cellContent = this.options.getBodyCellDisplay(
                                             header,
                                             row,
                                             headerIdx,
                                             rowIdx
                                         );
-                                        return html`<td class="${cellClass}">
+                                        return html`
+                                        <td>
                                             ${unsafeHTML(cellContent)}
                                         </td>`;
                                     } else {
