@@ -5,114 +5,71 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Data table example</title>
-        <script type="module" src="./data-table.js"></script>
+        <script type="module" src="../data-table.js"></script>
         <style>
             body {
                 font-family: Helvetica Neue, Helvetica, Arial, Verdana, Geneva, sans-serif;
                 letter-spacing: -0.00278rem;
                 line-height: 1.6;
+                
             }
+            main {
+                display: grid;
+                gap: 2rem;
+            }
+            
+            #custom {    
+                --custom-table-stripes-background-color: rgba(255, 206, 195, 0.4);
+                --custom-table-header-background-color: #ffcec3;
+                --custom-button-active-background-color: rgba(255, 206, 195, 0.6)
+            }
+            
         </style>
         <script type="module">
             import {data} from './data.js';
+            import * as options from './custom-options.js';
+
+            let zeroConfigDataTable = document.querySelector("#zero");
             
-            let getBodyCellDisplay = (header, row, headerIdx, rowIdx) => {
-                if (!header || !row) return '';
-
-                if (header.hasOwnProperty('subject')) {
-                    let grade = row.grades.find(g => g.subject === header.subject);
-                    let gradeSuffix = "";
-                    if (grade.length > 1) {
-                        gradeSuffix = grade[1] == "-" ? "-minus" : "-plus";
-                    }
-                    let cellClass = grade + gradeSuffix;
-                    let cellContent = `<span>${grade.value}</span>`;
-
-                    return {
-                        cellClass,
-                        cellContent
-                    };
-                } 
-                else {
-                    let headerId = header.title.toLowerCase();
-                    let cellClass=headerId;
-                    let cellContent = `<span>${row[headerId]}</span>`;
-                    if (row[headerId] == undefined) {
-                        cellContent = `<span></span`;
-                    }
-                    return {cellClass, cellContent};     
-                }
-            };
-
-            let getHeaderCellDisplay = (header, idx) => header.title;
-
-            let filters = {
-                age: {
-                    name: "Age",
-                    path: row => row.age
-                },
-                sport: {
-                    name: "Sport",
-                    path: row => row.sport,
-                    includeNone: true
-                }
-            };
+            // Zero-config
+            let zeroConfigData = {headers: Array.from(data.headers), rows: Array.from(data.rows)};
+            zeroConfigDataTable.data = zeroConfigData;
             
-            // return whether the row contains the text    
-            let textSearchFilter = (text, row, headers, hiddenColumns) => {
-                if (!row) return false;
-                let idx = row.name.toLowerCase().indexOf(text.toLowerCase());
-                let found = idx != -1 && idx != undefined;
-                if (found) return true;
-
-                idx = row.age.toString().indexOf(text.toLowerCase());
-                found = idx != -1 && idx != undefined;
-                if (found) return true;
-
-                idx = row.sport?.toLowerCase().indexOf(text.toLowerCase());
-                found = idx != -1 && idx != undefined;
-                if (found) return true;
-
-                // check each visible grade
-                let grades = headers
-                    .filter((header, idx) => hiddenColumns.includes(idx) == false)
-                    .filter(header => header.hasOwnProperty('subject'))
-                    .map(header => {
-                        let grade = row.grades.find(grade => grade.subject == header.subject);
-                        return grade.value;
-                    })
-                    .join(' ');
-                found = grades.toLowerCase().indexOf(text.toLowerCase()) != -1;
-                return found;
-            };
-
-            let options = {
-                getHeaderCellDisplay,
-                getBodyCellDisplay,
-                filters,
-                textSearchFilter,
-                showTextSearch: true,
-                defaultSortHeader: 0,
-                columnSelectorLabel: "Select a column",
-                filtersLabel: "Filters"
-            };           
+            // Custom config
+            let customDataTable = document.querySelector("#custom");
+            // merge the custom sorting
+            options.headerSorts.map((sortInfo, idx) => data.headers[idx] = {...data.headers[idx], ...sortInfo});
+            // assign custom functions
+            customDataTable.bodyCellDisplay = options.getBodyCellDisplay;
+            // use filters
+            customDataTable.filters = options.filters;
+            customDataTable.data = data;
             
-            document.querySelector("data-table").options = options;
-            document.querySelector("data-table").data = data;
+            // Events for both zero and custom
             window.addEventListener("resize", () => {
-                document.querySelector("data-table").render();
+                document.querySelector("#zero").render();
+                document.querySelector("#custom").render();
             });
+            let version = document.querySelector("#zero").version;
+            document.querySelector("#version").innerHTML = `Component version ${version}`;
         </script>
     </head>
     <body>
         <main>
-            <h1>Data table example (standalone js library usage)</h1>
-            <data-table 
-                summary="Student data, including grades per subject" >
-            </data-table>
-            <p>This uses the <code>data-table.js</code> file from its own directory (autocopied on build from <code>build/</code>).</p>
-        </main>
+            <div>
+            	<h1>Data table web component example</h1>
+            	<p id="version"></p>
+            </div>
+            <div>
+                <h2>Zero-config data table</h2>
+                <data-table id="zero" summary="Student data, including grades per subject" useAutoSort="true" showTextSearch="true"></data-table>
+            </div>
 
-        
+            <div>
+                <h2>Custom data table</h2>
+                <p>Adds custom sorting, custom data display, filtering, and custom colors.</p>
+                <data-table id="custom" summary="Student data, including grades per subject" showTextSearch="true"></data-table>
+            </div>
+        </main>
     </body>
 </html>

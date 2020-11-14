@@ -50,6 +50,8 @@ let getBodyCellDisplay = (header, row, headerIdx, rowIdx) => {
     }
 };
 
+let getHeaderCellDisplay = (header, idx) => header.title;
+
 let filters = {
     age: {
         name: "Age",
@@ -60,6 +62,34 @@ let filters = {
         path: row => row.sport,
         includeNone: true
     }
+};
+
+// return whether the row contains the text    
+let textSearchFilter = (text, row, headers, hiddenColumns) => {
+    if (!row) return false;
+    let idx = row.name.toLowerCase().indexOf(text.toLowerCase());
+    let found = idx != -1 && idx != undefined;
+    if (found) return true;
+
+    idx = row.age.toString().indexOf(text.toLowerCase());
+    found = idx != -1 && idx != undefined;
+    if (found) return true;
+
+    idx = row.sport?.toLowerCase().indexOf(text.toLowerCase());
+    found = idx != -1 && idx != undefined;
+    if (found) return true;
+
+    // check each visible grade
+    let grades = headers
+        .filter((header, idx) => hiddenColumns.includes(idx) == false)
+        .filter(header => header.hasOwnProperty('subject'))
+        .map(header => {
+            let grade = Object.keys(row).find(k => k === header.subject);
+            return grade;
+        })
+        .join(' ');
+    found = grades.toLowerCase().indexOf(text.toLowerCase()) != -1;
+    return found;
 };
 
 // we'd usually just include this in with the header data
@@ -116,11 +146,13 @@ let sortByGrade = (subject, rowA, rowB) => {
     let grade1idx = gradeWeight.indexOf(grade1);
     let grade2idx = gradeWeight.indexOf(grade2);
 
-    return grade1idx > grade2idx ? -1 : 1;
+    return grade1idx > grade2idx ? 1 : -1;
 };
 
 export {
     getBodyCellDisplay,
+    getHeaderCellDisplay,
     filters,
+    textSearchFilter,
     headerSorts
 };

@@ -11,8 +11,14 @@
                 font-family: Helvetica Neue, Helvetica, Arial, Verdana, Geneva, sans-serif;
                 letter-spacing: -0.00278rem;
                 line-height: 1.6;
+                
             }
-            :root {
+            main {
+                display: grid;
+                gap: 2rem;
+            }
+            
+            #custom {    
                 --custom-table-stripes-background-color: rgba(255, 206, 195, 0.4);
                 --custom-table-header-background-color: #ffcec3;
                 --custom-button-active-background-color: rgba(255, 206, 195, 0.6)
@@ -23,28 +29,49 @@
             import {data} from './dev/data.js';
             import * as options from './dev/custom-options.js';
 
-            let tableOptions = {
-                ...options,
-                showTextSearch: true,
-                defaultSortHeader: 0,
-                columnSelectorLabel: "Select a column",
-                filtersLabel: "Filters"
-            };           
+            let zeroConfigDataTable = document.querySelector("#zero");
             
-            document.querySelector("data-table").options = tableOptions;
-            document.querySelector("data-table").data = data;
+            // Zero-config
+            let zeroConfigData = {headers: Array.from(data.headers), rows: Array.from(data.rows)};
+            zeroConfigDataTable.data = zeroConfigData;
             
+            // Custom config
+            let customDataTable = document.querySelector("#custom");
+            // merge the custom sorting
+            options.headerSorts.map((sortInfo, idx) => data.headers[idx] = {...data.headers[idx], ...sortInfo});
+            // assign custom functions
+            customDataTable.bodyCellDisplay = options.getBodyCellDisplay;
+            // use filters
+            customDataTable.filters = options.filters;
+            customDataTable.data = data;
+            
+            // Events for both zero and custom
             window.addEventListener("resize", () => {
-                document.querySelector("data-table").render();
+                document.querySelector("#zero").render();
+                document.querySelector("#custom").render();
             });
+            let version = document.querySelector("#zero").version;
+            document.querySelector("#version").innerHTML = `Component version ${version}`;
         </script>
     </head>
     <body>
         <main>
-            <h1>Data table example (live development preview)</h1>
-            <data-table summary="Student data, including grades per subject"></data-table>
+            <div>
+            	<h1>Data table web component example (live development preview)</h1>
+            	<p id="version"></p>
+            </div>
+            <div>
+                <h2>Zero-config data table</h2>
+                <data-table id="zero" summary="Student data, including grades per subject" useAutoSort="true" showTextSearch="true"></data-table>
+            </div>
 
-            <p>This uses the <code>data-table.js</code> file from the root directory.</p>
+            <div>
+                <h2>Custom data table</h2>
+                <p>Adds custom sorting, custom data display, filtering, and custom colors.</p>
+                <data-table id="custom" summary="Student data, including grades per subject" showTextSearch="true"></data-table>
+            </div>
+
+            <p>This uses the <code>data-table.js</code> file from the development directory.</p>
         </main>
 
         
