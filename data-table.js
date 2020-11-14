@@ -1,7 +1,7 @@
 import {LitElement, html, css } from 'lit-element';
 import {unsafeHTML} from 'lit-html/directives/unsafe-html.js';
 import { dataTableStyles } from './data-table-styles.js';
-import { styleMap } from 'lit-html/directives/style-map';
+import * as defaults from './data-table-defaults.js';
 
 export class DataTable extends LitElement {
     static get styles() {
@@ -10,67 +10,73 @@ export class DataTable extends LitElement {
         ];
     }
 
-    /*
-    <data-table summary="..."></data-table>
-    data: {
-        rows: [...your row data...], 
-        headers: [{
-            sort: (rowA, rowB) => func to sort,
-            sortIs: "asc" | "desc" which direction is the default sort behavior,
-            any other fields
-        }]
-    },
-    options: {
-        defaultSortHeader: index of header to sort by, initially. 0 by default.,
-        getHeaderCellDisplay: func(header, idx) to get text displayed for a header cell,
-        getBodyCellDisplay: func(header, row, headerIdx, rowIdx) to get content displayed for a row cell,
-        filters: Array [{
-                name, 
-                path: func(row) for what to filter,
-                includeNone: boolean, if true "None" is included in the filter list and matches when path returns null/undefined
-            }, 
-            ... 
-        ],
-        textSearchFilter: (text, row, headers, hiddenColumns) evaluation function for text searching,
-        showTextSearch: boolean,
-        columnSelectorLabel: "Select a column",
-        filtersLabel: "Filters",
-        customClass: 'Class name(s)' to add to the wrapper <div class="data-table">
-    }
-    */
     static get properties() {
         return {
-            data: {type: Object,attribute: false,},
-            options: {type: Object, attribute: false},
-            hiddenColumns: {type: Array, attribute: false}, // this property doesn't get set, just observed internally
+            // data: {headers, rows}
+            data: {type: Object},
+            // accessible table summary
             summary: {type: String},
+            // external stylesheet
             stylesheet: {type: String},
+            // TODO is this needed
             customClass: {type: String},
+            // show a text search box
+            showTextSearch: {type: Boolean},
+            // default text search function
+            textSearchFilter: {attribute: false},
+            // default header cell display function
+            headerCellDisplay: {attribute: false},
+            // default body cell display function
+            bodyCellDisplay: {attribute: false},
+            // filters: {key: {name, path}, ...}
+            filters: {type: Object, attribute: false},
+            // header that gets sorted on by default (assuming there are sort functions on the headers)
+            defaultSortHeader: {type: Number},
+            // title for the column selectors
+            columnSelectorLabel: {type: String},
+            // title for the table filters
+            filtersLabel: {type: String},
+            // automatic sorting
+            useAutoSort: {type: Boolean},
             
+
+            // this property doesn't get set, just observed internally
+            hiddenColumns: {type: Array, attribute: false}
         };
     }
-
+    
     constructor() {
         super();
-        this.data = {headers: [], rows: []};
+        this.version = "0.1";
+        
+        // internal state
         this.enabledFilters = {}; // {filterName: filterValue, ...}
         this.enabledSort = {header: null, dir: null};
         this.textSearchString = '';
-        this.options = {
-            textSearchFilter: (text, row, headers, hiddenColumns) => true,
-            getHeaderCellDisplay: (header, idx) => '',
-            getBodyCellDisplay: (header, row, headerIdx, rowIdx) => '',
-            filters: [],
-            sort: [],
-            showTextSearch: false,
-            defaultSortHeader: 0,
-            columnSelectorLabel: '',
-            filtersLabel: ''
-        };
+
+        // default functions
+        this.textSearchFilter = defaults.textSearchFilter;
+        this.headerCellDisplay = defaults.headerCellDisplay;
+        this.bodyCellDisplay = defaults.bodyCellDisplay;
+        // no filters by default
+        this.filters = {};
+        // don't show a search box by default
+        this.showTextSearch = false;
+        // disable sorting by default
+        this.useAutoSort = false;
+        // sort on the first header by default
+        this.defaultSortHeader = 0;
+        // default labels
+        this.columnSelectorLabel = 'Select a column';
+        this.filtersLabel = 'Filters';
+        // other defaults
         this.stylesheet = '';
+        this.customClass = '';
+
+        // show all cols
         this.hiddenColumns = [];
-        this.customClass = '',
-        this.styles = {};
+        // initial empty dataset
+        this.data = {headers: [], rows: []};
     }
 
     setFilterValue(filterName, filterValue) {
@@ -79,18 +85,24 @@ export class DataTable extends LitElement {
     }
 
     enableSort(header) {
-        if (
-            !header.hasOwnProperty('sort') ||
+        if (!header.hasOwnProperty('sort') ||
             header.sort == null ||
             header.sort == undefined
         ) {
-            return;
+            if (this.useAutoSort && header.sort != false) {
+                header.sort = (a, b) => defaults.sortAlpha(a, b, header);
+                header.sortIs = 'asc';
+            }
+            else {
+                return;
+            }
         }
         if (this.enabledSort.header != header) {
             this.enabledSort.dir = null; //reset dir if not clicking the same header multiple times
         }
         this.enabledSort.header = header;
         let chooseOppositeSort = (dir) => (dir == 'asc' ? 'desc' : 'asc');
+        
         let newSortDir =
             this.enabledSort.dir == null || this.enabledSort.dir == undefined
                 ? header.sortIs
@@ -116,7 +128,7 @@ export class DataTable extends LitElement {
         });
         // apply the text search filter too
         filteredRows = filteredRows.filter((row) =>
-            this.options.textSearchFilter(
+            this.textSearchFilter(
                 this.textSearchString,
                 row,
                 this.data.headers,
@@ -130,10 +142,10 @@ export class DataTable extends LitElement {
     // apply a filter to a row
     // e.g. applyFilter(row, "os", "Windows")
     applyFilter(row, filterId, filterValue) {
-        if (Object.keys(this.options.filters).length == 0) {
+        if (Object.keys(this.filters).length == 0) {
             return true;
         }
-        let rowValue = this.options.filters[filterId].path(row);
+        let rowValue = this.filters[filterId].path(row);
         // convert string to bool
         if (filterValue == 'true' || filterValue == 'false') {
             filterValue = filterValue == 'true';
@@ -162,11 +174,8 @@ export class DataTable extends LitElement {
     // actually sort the rows by whichever header sort is enabled (or by the default, if none is selected)
     sortRows(rows) {
         
-        if (this.enabledSort.header == null && this.options.hasOwnProperty('defaultSortHeader')) {
-            this.enabledSort.header = this.data.headers[
-                this.options.defaultSortHeader
-            ];
-            this.enabledSort.dir = this.enabledSort.header?.sortIs ?? 'asc';
+        if (this.enabledSort.header == null && this.data.headers.length > 0) {
+            this.enableSort(this.data.headers[this.defaultSortHeader]);
         }
         // what are we sorting on?
         let sortedRows = this.enabledSort?.header?.hasOwnProperty('sort') ? 
@@ -174,8 +183,11 @@ export class DataTable extends LitElement {
             : 
             rows;
         
-        if (this.enabledSort.header 
-            && this.enabledSort.header.hasOwnProperty('sortIs')) {
+        if (this.enabledSort.header) {
+            // make sure the sortIs property is set
+            if (!this.enabledSort.header.hasOwnProperty('sortIs')) {
+                this.enabledSort.header.sortIs = 'asc';
+            }
             return this.enabledSort.dir == this.enabledSort.header.sortIs ? sortedRows : sortedRows.reverse();
         }
         else {
@@ -252,7 +264,7 @@ export class DataTable extends LitElement {
         Object.keys(this.enabledFilters).map(
             (filterId) => (this.enabledFilters[filterId] = 'all')
         );
-        Object.keys(this.options.filters).map((filterId) => {
+        Object.keys(this.filters).map((filterId) => {
             this.shadowRoot.querySelector(`#filter-${filterId}`).value = 'all';
         });
         this.requestUpdate();
@@ -303,8 +315,7 @@ export class DataTable extends LitElement {
                 ``
             }
 
-            <div class="data-table ${this.customClass}"
-                style=${styleMap(this.styles)}>
+            <div class="data-table ${this.customClass}">
                 ${filtersHtml} 
                 ${columnSelectorHtml}
 
@@ -322,8 +333,8 @@ export class DataTable extends LitElement {
                                 }
 
                                 let isSortable =
-                                    header.hasOwnProperty('sort') &&
-                                    header.sort;
+                                    (header.hasOwnProperty('sort') &&
+                                    header.sort) || (this.useAutoSort && header.sort != false);
                                 let isSortEnabled =
                                     this.enabledSort.header == header;
                                 let sortDir = '';
@@ -339,14 +350,14 @@ export class DataTable extends LitElement {
                                     return html` <th
                                         class="sortable"
                                         @click=${() => this.enableSort(header)}
-                                        title="Sort by ${this.options.getHeaderCellDisplay(
+                                        title="Sort by ${this.headerCellDisplay(
                                             header, idx
                                         )}"
                                         aria-sort="${sortDir}"
                                     >
                                         <span tabIndex="0" role="button">
                                             ${unsafeHTML(
-                                                this.options.getHeaderCellDisplay(
+                                                this.headerCellDisplay(
                                                     header, idx
                                                 )
                                             )}
@@ -355,7 +366,7 @@ export class DataTable extends LitElement {
                                 } else {
                                     return html`<th>
                                         ${unsafeHTML(
-                                            this.options.getHeaderCellDisplay(
+                                            this.headerCellDisplay(
                                                 header, idx
                                             )
                                         )}
@@ -372,7 +383,7 @@ export class DataTable extends LitElement {
                                         this.hiddenColumns.includes(headerIdx) ==
                                         false
                                     ) {
-                                        let cellContent = this.options.getBodyCellDisplay(
+                                        let cellContent = this.bodyCellDisplay(
                                             header,
                                             row,
                                             headerIdx,
@@ -395,25 +406,9 @@ export class DataTable extends LitElement {
     }
 
     renderFilters() {
-        /*
-        Desktop
-
-        fieldset<filters? text search?>
-        table
-
-        Mobile
-        details/summary (if filters)
-            <fieldset filters? text search?>
-        if no filters
-            text search?
-        column selector
-        table
-
-        */
-
         let isMobile = window.matchMedia('(max-width: 768px)').matches;
-        let hasDropDownFilters = Object.keys(this.options.filters).length > 0;
-        let hasTextSearch = this.options.showTextSearch;
+        let hasDropDownFilters = Object.keys(this.filters).length > 0;
+        let hasTextSearch = this.showTextSearch;
 
         let textSearchHtml = hasTextSearch ? 
         html` 
@@ -438,9 +433,9 @@ export class DataTable extends LitElement {
         if (hasDropDownFilters) {
             filtersHtml = html`
             <fieldset class="filters">
-                <legend>${this.options.filtersLabel}</legend>
-                ${Object.keys(this.options.filters).map(filterId => {
-                    let filter = this.options.filters[filterId];
+                <legend>${this.filtersLabel}</legend>
+                ${Object.keys(this.filters).map(filterId => {
+                    let filter = this.filters[filterId];
                     let filterOptions = this.generateFilterOptions(filter);
                     return html`
                     <div>
@@ -482,7 +477,7 @@ export class DataTable extends LitElement {
             if (isMobile) {
                 filtersHtml = html`
                 <details ?open=${true}>
-                    <summary>${this.options.filtersLabel}</summary>
+                    <summary>${this.filtersLabel}</summary>
                     ${filtersHtml}
                 </details>`;
             }
@@ -492,7 +487,7 @@ export class DataTable extends LitElement {
             if (hasTextSearch) {
                 filtersHtml = html`
                 <fieldset class="filters">
-                <legend>${this.options.filtersLabel}</legend>
+                <legend>${this.filtersLabel}</legend>
                     ${textSearchHtml}
                 </fieldset>`;
             }
@@ -507,7 +502,7 @@ export class DataTable extends LitElement {
 
         return html`
             <fieldset class="column-selectors">
-                <legend>${this.options.columnSelectorLabel}</legend>
+                <legend>${this.columnSelectorLabel}</legend>
                 ${this.data.headers.map((header, idx) =>
                     idx > 0
                         ? html`
