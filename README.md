@@ -4,8 +4,7 @@ This data table web component is built using [LitElement](https://lit-element.po
 
 See a [live demo](https://marisademeglio.github.io/data-table-web-component/example)
 
-
-Use it in your own project: [download](https://github.com/marisademeglio/data-table-web-component/build/data-table.js)
+[Download](https://github.com/marisademeglio/data-table-web-component/blob/master/build/data-table.js)
 
 Features:
 
