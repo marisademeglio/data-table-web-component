@@ -9,10 +9,8 @@ Use it in your own project: [download](https://github.com/marisademeglio/data-ta
 
 Features:
 
-* Create your own header and body table cell display functions to customize how your data is displayed
-* Accepts any type of data, so long as it fits into a JSON array
-* Custom sorting functions
-* Custom filters
+* Reasonable set of defaults for display, searching, sorting
+* Customization of data display, sorting, searching, filtering
 * Mobile-friendly display with one column at a time and column switcher buttons
 * Uses accessibility best practices; always looking for more feedback here though. 
 
@@ -30,210 +28,116 @@ Copy `build/data-table.js` to your project.
 
 ## Using it
 
-Include the script:
-
+### Minimal example
 ```html
 <script type="module" src="./data-table.js"></script>
-```
+<script>
+    const data = {
+        headers: [
+            "Name",
+            "Age"
+        ],
+        data: [
+            {
+                name: "Sam",
+                age: 23
+            },
+            {
+                name: "Jordan",
+                age: 34
+            }
+        ]
+    }
+    document.querySelector("data-table").data = data;
+</script>
 
-Use the element:
-```html
 <body>
-    <data-table summary="The table" customclass="my-custom-class" stylesheet="/css/table-style.css"></data-table>
+    <data-table summary="Names and ages of participants" showTextSearch="true"></data-table>
 </body>
 ```
 
-Define some data and include column sorting behavior:
+## The defaults
+
+
+### Cell display
+
+The built-in function to calculate a header cell's displayed contents looks for information in this order:
+
+1. If the cell data is a string, display it
+2. If the cell data has a property `title`, `name`, or `value`, display it
+
+
+In the case of rows, the row contents are determined to be value of the property that matches the header name (as determined above). 
+
+So, any of the following will result in something reasonable being shown:
 
 ```js
-<script>
-const data = {
-    headers: [
-        {
-            title: "Name",
-            sort: (a, b) => a > b ? 1 : -1,
-            sortIs: "asc"
-        },
-        {
-            title: "Age",
-            sort: (a, b) => a > b ? 1 : -1,
-            sortIs: "asc"
-        }
-    ],
-    data: [
-        {
-            name: "Sam",
-            age: 23
-        },
-        {
-            name: "Jordan",
-            age: 34
-        }
-    ]
-}
-</script>
+headers = ["A", "B", "C"];
+data = [
+    {a: "Apple", b: "Banana", c: "Canteloupe"}, 
+    {a: "Aardvark", b: "Bear", c: "Cat"}, 
+    {a: "Airplane", b: "Bus", c: "Cruise ship"}
+];
 ```
 
-Define some options:
+### Searching
 
+Set `showTextSearch = true` to enable the search box. If no search function is provided, simple string matching is used, according to the display algorithm described above.
+
+
+### Sorting
+
+Set `useAutoSort = true`. to enable automatic alpha-order column sorting. You can combine `useAutoSort = true` with setting a header's `sort` attribute to `false`, to selectively disable automatic sorting.
+
+## Customizing
+
+All the properties:
+
+* `columnSelectorLabel`: Title of the column selector section
+* `bodyCellDisplay` :function `(header, row, headerIdx, rowIdx) =>` returns `string`
+* `data`. Has two properties:
+    * `headers`: Array of header data. Each can be any JSON object. Sorting info can be attached as properties per header:
+        * `sort`: sorting function `(rowA, rowB) =>` returns -1, 1, or 0. Can also be `false` to disable sorting.
+        * `sortIs`: `"asc"` or `"desc"`. Whether the sorting function returns data in ascending or descending order. 
+    * `rows`: Array of row data. Each can be any JSON object.
+* `defaultSortHeader`: Index of the header that is initially sorted. Defaults to `0`.
+* `filters`: object containing filters. Each object has these properties:
+    * `name`: display name of the filter
+    * `path`: function `(row) =>` returns the row data relevant to the filter
+    * `includeNone`: `boolean`, whether to include a "None" option, applies to when the `path` function returns null/undefined/''.
+    
 ```js
-<script>
-let options = {
-    getHeaderCellDisplay: (header, idx) => header.title,
-    getBodyCellDisplay (header, row, headerIdx, rowIdx) => header.title == "Name" ? row.name : row.age,
-    filters: {},
-    textSearchFilter: (text, row, headers, hiddenColumns) => {
-        // simple searching of name and age
-        return row.name.toLowerCase().indexOf(text.toLowerCase()) != -1 || 
-            row.age.toLowerCase().indexOf(text.toLowerCase()) != -1;
+let filters = {
+    fullName: {
+        name: "Name",
+        path: row => row.name
     },
-    showTextSearch: true,
-    defaultSortHeader: 0,
-    columnSelectorLabel: "Select a column",
-    filtersLabel: "Filters",
-    customClass: "my-table"
-};      
-</script>
-```
-
-Assign your data and options to the data-table element:
-
-```js
-<script>
-document.querySelector("data-table").options = options;
-document.querySelector("data-table").data = data;
-</script>
-```
-
-## More about the options
-
-Code here is generally taken from the more complicated table in `example/`.
-
-### `getHeaderCellDisplay`
-A function to return what gets displayed in the header cell. 
-
-```js
-getHeaderCellDisplay: (header, idx) => header.title;
-```
-
-### `getBodyCellDisplay`
-A function to return what gets displayed in the body cell
-
-```js
-getBodyCellDisplay: (header, row, headerIdx, rowIdx) => {
-
-    if (header.hasOwnProperty('subject')) {
-        let {grades} = row;
-        let grade = grades.find(aset => grade.subject === header.subject);
-        let gradeSuffix = "";
-        if (grade.length > 1) {
-            gradeSuffix = grade[1] == "-" ? "-minus" : "-plus";
-        }
-        let cellClass = grade + gradeSuffix;
-        let cellContent = `<span>${grade}</span>`;
-
-        return {
-            cellClass,
-            cellContent
-        };
-    } 
-    else {
-        let cellClass="name";
-        let cellContent = `<span>${row.name}</span>`;
-        return {cellClass, cellContent};     
-    }
-};
-```
-
-### `filters`: 
-
-Filters appear as a series of select boxes before the table. The options in each box are labeled according to the `name` below, and their values are populated and matched by the function given by `path`.
-
-The option `includeNone` creates an option called "None", which will return any row for which the `path` function returns null, undefined, "null", "undefined". 
-
-All filters always get an option called "All".
-
-```js
-filters: 
-{
     age: {
         name: "Age",
         path: row => row.age
-    },
-    sport: {
-        name: "Sport",
-        path: row => row.sport,
-        includeNone: true
     }
 };
 ```
+* `filtersLabel`: Title of the filters section
+* `headerCellDisplay`: function `(header, idx) =>` returns `string`
+* `showTextSearch`: `boolean`, whether to display the text search box. Defaults to `false`.
+* `textSearchFilter`: function `(text, row, headers, hiddenColumns) =>` returns `boolean`, whether the row contains the text or not.
+* `useAutoSort`: `boolean`, whether to automatically sort columns alphabetically. Defaults to `false`.
 
-### textSearchFilter
+### Notes
 
-Function to search the text by.
-
-Parameters are:
-* `text` search string
-* `row` current row
-* `headers` what all the headers are
-* `hiddenColumns` if any columns are being hidden
-
-```js
-textSearchFilter:
-(text, row, headers, hiddenColumns) => {      
-    if (!row) return false;
-        let idx = row.name.toLowerCase().indexOf(text.toLowerCase());
-        let found = idx != -1 && idx != undefined;
-        if (found) return true;
-
-        idx = row.age.toString().indexOf(text.toLowerCase());
-        found = idx != -1 && idx != undefined;
-        if (found) return true;
-
-        idx = row.sport?.toLowerCase().indexOf(text.toLowerCase());
-        found = idx != -1 && idx != undefined;
-        if (found) return true;
-
-        // check each visible grade
-        let grades = headers
-            .filter((header, idx) => hiddenColumns.includes(idx) == false)
-            .filter(header => header.hasOwnProperty('subject'))
-            .map(header => {
-                let grade = row.grades.find(grade => grade.subject == header.subject);
-                return grade.value;
-            })
-            .join(' ');
-        found = grades.toLowerCase().indexOf(text.toLowerCase()) != -1;
-        return found;
-};
-```
-
-### showTextSearch
-
-If `true`, results in a text search box being added after the filters. Searching begins upon typing.
-
-### defaultSortHeader
-
-Index of the header that is initially sorted
-
-### `columnSelectorLabel`
-
-Labels the column selector section.
-
-### `filtersLabel`
-
-Labels the filters section.
-
+* Attach sort functions to `headers`
+* You can return HTML from the `headerCellDisplay` and `bodyCellDisplay` functions
+* Search only the text of what's being displayed via the `textSearchFilter` `hiddenColumns` parameter, which is an array of the indices of the hidden columns. The `headers` parameter gives all the headers in order.
+* For a complex example, view the source of the [epubtest.org results grid](http://epubtest.org/results)
 
 ## About mobile display
 
-On screens 768px or narrower, the table shows its two leftmost columns, to start with. The first column is fixed, and the second column can be changed via a series of buttons above the table.
+On screens 768px or narrower, the table shows only two columns. Initially it's the first two (leftmost) columns. The first column is always fixed, and the second column can be changed via a series of buttons above the table.
 
 The visibility of the buttons is controlled, in this example, by CSS.
 
 The function of how many columns to show, and the restriction to 2 cols at the breakpoint width, is controlled by javascript.
-
-So, if you start with a wide screen and then shrink it down, you have to refresh before the change kicks in. This being an uncommon way to view a table, I don't think it's a big deal, but it could be improved upon to make it completely dynamically responsive. 
 
 ## Style
 
@@ -260,13 +164,11 @@ Use the data table element's `stylesheet` attribute to provide a stylesheet for 
 
 Customize more text, e.g.
 
-* The title of the sort buttons says "Sort by _header_" but you can't change the "Sort by" part
+* The titles of the sort buttons say "Sort by _header_" but you can't change the "Sort by" part
 * The search field is always called "Search"
 
-Introduce defaults for sorting and searching, to reduce the configuration required.
-
-Multiple levels of headers
+Support multiple levels of headers
 
 Second option for mobile adaptation: paginated view
 
-Filters that use observable properties
+Filters that use observable properties, to make this code less monolithic.
