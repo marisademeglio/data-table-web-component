@@ -13,7 +13,7 @@ const copyConfig = {
 // The main JavaScript bundle for modern browsers that support
 // JavaScript modules and other ES2015+ features.
 const config = {
-  input: 'data-table.js',
+  input: ['data-table.js'],
   output: {
     dir: 'build',
     format: 'es',
